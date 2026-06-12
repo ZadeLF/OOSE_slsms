@@ -36,8 +36,14 @@ export const api = {
   // Sensors
   pushNoise: (zoneId, dB) => post('/api/sensors/noise', { zoneId, dB }),
   getNoise: (zoneId) => get(`/api/sensors/noise/${zoneId}`),
+  pushTemperature: (zoneId, celsius) => post('/api/sensors/temperature', { zoneId, celsius }),
+  getTemperature: (zoneId) => get(`/api/sensors/temperature/${zoneId}`),
 
   // Alerts
   recentAlerts: () => get('/api/alerts/recent'),
-  getSignage: (zoneId) => get(`/api/alerts/signage/${zoneId}`)
+  getSignage: (zoneId) => get(`/api/alerts/signage/${zoneId}`),
+
+  // Reports
+  listReportTypes: () => get('/api/reports'),
+  getReport: (type) => get(`/api/reports/${type}`)
 };

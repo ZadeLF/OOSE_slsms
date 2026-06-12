@@ -3,6 +3,8 @@ import { api } from './api/slsmsApi.js';
 import FloorMap from './components/FloorMap.jsx';
 import ControlPanel from './components/ControlPanel.jsx';
 import NoiseSimulator from './components/NoiseSimulator.jsx';
+import TemperatureSimulator from './components/TemperatureSimulator.jsx';
+import ReportPanel from './components/ReportPanel.jsx';
 import RecentAlerts from './components/RecentAlerts.jsx';
 
 const FLOOR_ID = '1';
@@ -145,7 +147,11 @@ export default function App() {
 
       <NoiseSimulator onAlertChange={() => setAlertTick((t) => t + 1)} />
 
+      <TemperatureSimulator onAlertChange={() => setAlertTick((t) => t + 1)} />
+
       <RecentAlerts tick={alertTick} />
+
+      <ReportPanel />
     </div>
   );
 }

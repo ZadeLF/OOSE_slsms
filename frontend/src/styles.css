@@ -213,6 +213,22 @@ button {
   color: #791f1f;
 }
 
+/* Report table */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.report-table th, .report-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 0.5px solid var(--border);
+}
+.report-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 /* Recent alerts list */
 .alerts-list {
   list-style: none;
