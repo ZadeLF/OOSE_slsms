@@ -38,7 +38,7 @@
 | 核心服務 | V1.0 範圍 |
 |---|---|
 | 動態狀態追蹤 (Dynamic State Management) | ✅ **已完成** — 透過 State Pattern 即時呈現座位狀態(空閒/已預約/使用中/暫離),前端每 2 秒輪詢更新 |
-| 預約與 Check-in 流程 | ✅ **已完成(簡化版)** — 即時預約 + 模擬 QR Code Check-in;**分時段預訂、預約逾時自動釋放的排程機制為 V2 規劃中** |
+| 預約與 Check-in 流程 | ✅ **已完成(簡化版)** — 即時預約 + QR Code Check-in(QR 為真實編碼,掃描提交動作以「模擬掃描成功」按鈕觸發);**分時段預訂、預約逾時自動釋放的排程機制為 V2 規劃中** |
 | 環境感知報警 (Observer-Based Environmental Alert) | ✅ **已完成(噪音)** — 噪音超標時透過 Observer Pattern 推播給管理員推播通道與數位看板;**溫度感測為 V2 規劃中** |
 | 資源使用分析 (Data Abstraction & Reporting) | 🔲 **V2 規劃中** — 熱點報告、使用率報表(Strategy Pattern)尚未實作 |
 
@@ -58,10 +58,10 @@
 | 編號 | 需求名稱 | 需求描述 | 優先級 | V1.0 狀態 |
 |---|---|---|---|---|
 | FR-01 | 查詢座位狀態 | 系統應於 2 秒內以視覺化樓層圖呈現所有座位的即時狀態 (空閒/使用中/暫離/已預約)。 | 高 | ✅ 已完成 — 前端每 2 秒輪詢 `GET /api/floors/{id}/seats` |
-| FR-02 | QR Code Check-in | 讀者掃描座位 QR Code 後,系統切換座位狀態為「使用中」。 | 高 | ✅ 已完成(簡化版) — 前端顯示模擬 QR Code,點擊「模擬掃描成功」呼叫 `POST /api/seats/{id}/checkin`;**身分驗證 (JWT) 為 V2 規劃中** |
+| FR-02 | QR Code Check-in | 讀者掃描座位 QR Code 後,系統切換座位狀態為「使用中」。 | 高 | ✅ 已完成(簡化版) — 前端顯示真實編碼的 QR Code(內容為 `SLSMS:CHECKIN:{seatId}`,可被任何 QR Reader 掃描),點擊「模擬掃描成功」呼叫 `POST /api/seats/{id}/checkin`;**相機掃描整合與身分驗證 (JWT) 為 V2 規劃中** |
 | FR-03 | 即時預約 | 讀者可選擇空閒座位進行即時預約;預約成功後 15 分鐘內未 Check-in 則自動釋放。 | 高 | ⚠️ **部分完成** — 預約動作 (`POST /api/seats/{id}/reserve`) 已完成;「15 分鐘逾時自動釋放」的狀態轉移 (`timeout()`) 已在 domain 層實作並有單元測試 (TC-05),但**自動排程觸發為 V2 規劃中**,V1 demo 需手動呼叫 |
 | FR-04 | 分時段預訂 | 讀者可預訂未來 7 天內、以 30 分鐘為粒度的座位時段;系統需校驗無時段衝突。 | 中 | 🔲 **V2 規劃中** — 未實作 |
-| FR-05 | 暫離模式 | 使用中讀者可以將座位切為「暫時離開」最多 30 分鐘;逾時則自動釋放。 | 中 | ⚠️ **部分完成** — 暫離/回來動作 (`leave-temp` / `come-back`) 已完成;「30 分鐘逾時自動釋放」的狀態轉移已在 domain 層實作並有單元測試 (TC-07),但**自動排程觸發為 V2 規劃中** |
+| FR-05 | 暫離模式 | 使用中讀者可以將座位切為「暫時離開」最多 30 分鐘;逾時則自動釋放。 | 中 | ⚠️ **部分完成** — 暫離/回來動作 (`leave-temp` / `come-back`) 已完成,且僅限該座位目前的使用者本人操作(其他 `userId` 會收到 409,見 `SeatStateTransitionTest` 的 `*_by_other_user_rejected` 系列測試);「30 分鐘逾時自動釋放」的狀態轉移已在 domain 層實作並有單元測試 (TC-07),但**自動排程觸發為 V2 規劃中** |
 | FR-06 | 噪音/溫度警示 | 感測器讀數逾門檻值時,系統應推播警示給該區管理員與數位看板。 | 中 | ⚠️ **部分完成** — **噪音**警示已完成 (Observer Pattern,邊緣觸發,5 條單元測試全綠);**溫度感測為 V2 規劃中** |
 | FR-07 | 管理員後台 | 管理員可強制釋放座位、查看歷史紀錄、處理檢舉。 | 中 | 🔲 **V2 規劃中** — 未實作 |
 | FR-08 | 使用分析報表 | 系統每日產生熱點/使用率報表,並提供 CSV 匯出。 | 低 | 🔲 **V2 規劃中** — 未實作(原規劃以 Strategy Pattern 實作 `IReportStrategy`) |
@@ -76,7 +76,7 @@
 | 可靠性 (Reliability) | 月可用度 ≥ 99.5%;預約資料零遺失(持久化 + 交易) | ⚠️ V1.0 使用 **in-memory (`ConcurrentHashMap`)** 儲存,後端重啟資料即清空;**持久化 (JPA/MySQL) 與交易保證為 V2 規劃中**,可用性指標不適用於目前 demo |
 | 可重用性 (Reusability) | 感測器模組可換廠牌(抽象介面) | ⚠️ 噪音感測以 REST 端點接收數值,**`ISensorAdapter` 抽象介面尚未實作**(V2 規劃中);但 State / Observer / Repository 的介面化設計已展現開放封閉原則 |
 | 安全性 (Security) | JWT 驗證、HTTPS、資料庫密碼以 bcrypt 加鹽雜湊 | 🔲 **V2 規劃中** — V1.0 所有 API 皆為公開端點,無登入與權限機制,前端以固定示範使用者 ID 操作 |
-| 可維護性 (Maintainability) | Cyclomatic Complexity ≤ 10;單元測試覆蓋率 ≥ 70% | ✅ 15 條單元測試全綠,涵蓋 State Pattern(10 條)與 Observer Pattern(5 條)核心邏輯;Cyclomatic Complexity 未量測工具驗證 |
+| 可維護性 (Maintainability) | Cyclomatic Complexity ≤ 10;單元測試覆蓋率 ≥ 70% | ✅ 19 條單元測試全綠,涵蓋 State Pattern(14 條,含使用者歸屬驗證)與 Observer Pattern(5 條)核心邏輯;Cyclomatic Complexity 未量測工具驗證 |
 | 可用性 (Usability) | 讀者首次使用即上手,完成預約流程 ≤ 4 步;手機 RWD 全相容 | ✅ 操作流程(點選座位 → 選動作 → [QR] → 結果)≤ 4 步;**行動裝置 RWD 相容性尚未專門驗證** |
 
 ---
@@ -108,7 +108,7 @@
 | 主要 Actor | Reader (讀者) |
 | 前置條件 | 座位處於「空閒」或「已預約 (本人)」狀態 |
 | 後置條件 (成功) | 座位狀態切換為「使用中」 |
-| 主要流程 (Main Flow) | 1. 讀者於前端點擊座位上的「掃 QR Check-in」<br>2. 系統顯示該座位的模擬 QR Code<br>3. 讀者點擊「模擬掃描成功」<br>4. 系統呼叫 `POST /api/seats/{id}/checkin`<br>5. `SeatState.checkIn()` 依目前狀態決定是否允許,允許則切換為「使用中」並回傳成功訊息 |
+| 主要流程 (Main Flow) | 1. 讀者於前端點擊座位上的「掃 QR Check-in」<br>2. 系統顯示該座位的 QR Code(以 `qrcode.react` 產生,內容為真實編碼字串 `SLSMS:CHECKIN:{seatId}`,可被任何 QR Reader 掃描得到相同內容)<br>3. 讀者點擊「模擬掃描成功」(代表已用裝置掃描並取得上述字串)<br>4. 系統呼叫 `POST /api/seats/{id}/checkin`<br>5. `SeatState.checkIn()` 依目前狀態決定是否允許,允許則切換為「使用中」並回傳成功訊息 |
 | 替代流程 A1 | 若座位為「他人預約中」(`reservationOwner` 非本人),系統回傳 409 Conflict,前端顯示紅色錯誤條 |
 | 異常流程 E1 | 座位 ID 不存在 → 回傳 404,前端顯示錯誤訊息 |
-| **V2 規劃中** | 真實 QR Code 掃描、JWT 身分驗證、替代流程 A2(JWT 過期導向重新登入) |
+| **V2 規劃中** | 以相機/瀏覽器 API 實際掃描並解析 QR 內容(取代「模擬掃描成功」按鈕)、JWT 身分驗證、替代流程 A2(JWT 過期導向重新登入) |

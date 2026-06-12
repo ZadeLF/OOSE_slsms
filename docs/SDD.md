@@ -24,7 +24,7 @@ V1.0 採三層式 (3-Tier) 架構並結合 MVC 模式:
 
 | 層次 | 技術選型(實際) | 主要職責 |
 |---|---|---|
-| 呈現層 (Presentation) | React 18 + Vite | 樓層圖渲染、座位操作面板、模擬 QR Code、噪音模擬器 |
+| 呈現層 (Presentation) | React 18 + Vite | 樓層圖渲染、座位操作面板、QR Code(`qrcode.react` 產生真實編碼)、噪音模擬器 |
 | 應用層 (Application) | Spring Boot 3 (Java 17) | REST API、State 轉換 (`domain/state/`)、Observer 通知 (`observer/`) |
 | 資料層 (Data) | **In-memory (`ConcurrentHashMap`)**,透過 `SeatRepository` 封裝 | 儲存 Floor / Zone / Seat 物件;**後端重啟即清空,無持久化** |
 | 感測器輸入 | 前端「噪音模擬器」直接呼叫 `POST /api/sensors/noise` | 模擬感測器推送讀數,無實體感測器 / MQTT |
@@ -68,7 +68,7 @@ Floor 1 ──* Zone 1 ──* Seat 1 ──1 SeatState
 
 | 報告中的類別 | V1.0 實際狀況 |
 |---|---|
-| `Reservation` | 簡化為 `Seat` 物件上的屬性:`reservationOwner`(預約者)、`sessionStart`(使用起始時間),未獨立成類別 |
+| `Reservation` | 簡化為 `Seat` 物件上的屬性:`reservationOwner`(預約者)、`sessionStart`(使用起始時間),未獨立成類別;但 `reservationOwner` / `currentUserId` 的歸屬驗證已在 `IdleState`、`ReservedState`、`OccupiedState`、`TempAwayState` 中一致實作(見第 4 節) |
 | `Reader` / `Admin` | 🔲 V2 規劃中 — V1.0 無使用者帳號模型,前端以固定字串 `demo-user-001` 代表操作者,無角色區分 |
 | `SensorReading` | 簡化為 `NoiseMonitor` 內部以 `Map<zoneId, latestDb>` 暫存最新讀數,未獨立成持久化實體 |
 | `UsageRecord` | 🔲 V2 規劃中 — 報表子系統尚未實作,因此沒有對應的使用紀錄實體 |
@@ -88,7 +88,7 @@ Floor 1 ──* Zone 1 ──* Seat 1 ──1 SeatState
 | Concrete States | `IdleState`、`ReservedState`、`OccupiedState`、`TempAwayState` |
 | Flyweight / Singleton 持有器 | `domain/state/SeatStates.java` |
 
-驗證測試:`SeatStateTransitionTest.java`,共 10 條,全綠。
+驗證測試:`SeatStateTransitionTest.java`,共 14 條,全綠。
 
 ### 3.2 Observer Pattern — 噪音環境警示 ✅ 已完成(★ 核心;溫度感測為 V2 規劃中)
 
@@ -153,7 +153,9 @@ Floor 1 ──* Zone 1 ──* Seat 1 ──1 SeatState
 | **Occupied (使用中)** | — | — | TempAway | — | Idle | — |
 | **TempAway (暫時離開)** | — | — | — | Occupied | Idle | Idle |
 
-✅ 已驗證:所有上述轉移與非法轉移(回傳 409)皆由 `SeatStateTransitionTest.java`(10 條)覆蓋,全綠。
+✅ 已驗證:所有上述轉移與非法轉移(回傳 409)皆由 `SeatStateTransitionTest.java`(14 條)覆蓋,全綠。
+
+> ✅ **使用者歸屬驗證**:`release()`、`leaveTemp()`(Occupied)與 `comeBack()`、`release()`(TempAway)皆會檢查呼叫者 `userId` 是否等於 `seat.getCurrentUserId()`,不符則丟出 `IllegalStateTransitionException`(回傳 409),確保座位使用中/暫離期間不會被非本人操作。對應測試:`occupied_release_by_other_user_rejected`、`occupied_leave_temp_by_other_user_rejected`、`temp_away_come_back_by_other_user_rejected`、`temp_away_release_by_other_user_rejected`。此驗證機制與 `ReservedState.checkIn()` 對 `reservationOwner` 的檢查一致,共同構成簡化版的「使用者歸屬」概念(對應 2.2 節 `Reservation`/`Reader` 範圍縮減說明)。`timeout()` 為系統/排程觸發,不帶 `userId`,不受此限制。
 
 > ⚠️ **排程說明**:`timeout()` 轉移(對應 FR-03 預約逾時、FR-05 暫離逾時)在 domain 層已正確實作並通過單元測試(TC-05、TC-07),
 > 但 V1.0 **沒有背景排程器 (scheduler) 自動呼叫 `timeout()`**——也就是說,V1.0 demo 中座位不會「自動」逾時釋放,
