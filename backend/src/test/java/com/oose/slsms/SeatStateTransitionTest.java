@@ -110,4 +110,46 @@ class SeatStateTransitionTest {
         assertThrows(IllegalStateTransitionException.class,
                 () -> seat.reserve("user-2"));
     }
+
+    // Occupied seat cannot be released by another user
+    @Test
+    void occupied_release_by_other_user_rejected() {
+        Seat seat = newSeat();
+        seat.checkIn("user-1");
+        assertThrows(IllegalStateTransitionException.class,
+                () -> seat.release("user-2"));
+        assertEquals("OCCUPIED", seat.getStateName());
+    }
+
+    // Occupied seat cannot be set to "leave temporarily" by another user
+    @Test
+    void occupied_leave_temp_by_other_user_rejected() {
+        Seat seat = newSeat();
+        seat.checkIn("user-1");
+        assertThrows(IllegalStateTransitionException.class,
+                () -> seat.leaveTemporarily("user-2"));
+        assertEquals("OCCUPIED", seat.getStateName());
+    }
+
+    // TempAway seat cannot be resumed ("come back") by another user
+    @Test
+    void temp_away_come_back_by_other_user_rejected() {
+        Seat seat = newSeat();
+        seat.checkIn("user-1");
+        seat.leaveTemporarily("user-1");
+        assertThrows(IllegalStateTransitionException.class,
+                () -> seat.comeBack("user-2"));
+        assertEquals("TEMP_AWAY", seat.getStateName());
+    }
+
+    // TempAway seat cannot be released by another user
+    @Test
+    void temp_away_release_by_other_user_rejected() {
+        Seat seat = newSeat();
+        seat.checkIn("user-1");
+        seat.leaveTemporarily("user-1");
+        assertThrows(IllegalStateTransitionException.class,
+                () -> seat.release("user-2"));
+        assertEquals("TEMP_AWAY", seat.getStateName());
+    }
 }
