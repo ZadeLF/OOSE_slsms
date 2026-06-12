@@ -17,8 +17,9 @@ public class AdminPushChannel implements AlertObserver {
     private static final int MAX_BUFFER = 50;
     private final Deque<AlertEvent> buffer = new LinkedList<>();
 
-    public AdminPushChannel(NoiseMonitor monitor) {
-        monitor.register(this);
+    public AdminPushChannel(NoiseMonitor noiseMonitor, TemperatureMonitor temperatureMonitor) {
+        noiseMonitor.register(this);
+        temperatureMonitor.register(this);
     }
 
     @Override

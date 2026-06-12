@@ -4,6 +4,7 @@ import com.oose.slsms.domain.Floor;
 import com.oose.slsms.domain.Seat;
 import com.oose.slsms.domain.Zone;
 import com.oose.slsms.observer.NoiseMonitor;
+import com.oose.slsms.observer.TemperatureMonitor;
 import com.oose.slsms.repository.SeatRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
@@ -17,10 +18,13 @@ public class DataInitializer {
 
     private final SeatRepository repository;
     private final NoiseMonitor noiseMonitor;
+    private final TemperatureMonitor temperatureMonitor;
 
-    public DataInitializer(SeatRepository repository, NoiseMonitor noiseMonitor) {
+    public DataInitializer(SeatRepository repository, NoiseMonitor noiseMonitor,
+                            TemperatureMonitor temperatureMonitor) {
         this.repository = repository;
         this.noiseMonitor = noiseMonitor;
+        this.temperatureMonitor = temperatureMonitor;
     }
 
     @PostConstruct
@@ -42,8 +46,10 @@ public class DataInitializer {
         repository.saveZone(zoneA);
         repository.saveFloor(floor);
         noiseMonitor.setThreshold(zoneA.getId(), zoneA.getNoiseThresholdDb());
+        temperatureMonitor.setBounds(zoneA.getId(), 18.0, 28.0);
 
         System.out.println("[DataInitializer] seeded floor=1F zone=A with 12 seats; "
-                + "noise threshold = " + zoneA.getNoiseThresholdDb() + " dB");
+                + "noise threshold = " + zoneA.getNoiseThresholdDb() + " dB; "
+                + "temperature bounds = 18.0~28.0 °C");
     }
 }
