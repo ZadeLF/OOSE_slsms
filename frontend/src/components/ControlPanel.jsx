@@ -82,7 +82,7 @@ export default function ControlPanel({
           <div className="qr-info">
             <h3>掃描座位 {seat.id} 的 QR Code</h3>
             <p>
-              系統會驗證您的 JWT,並透過 SeatState.checkIn() 將狀態切換為「使用中」。
+              系統會透過 SeatState.checkIn() 檢查座位目前狀態並切換為「使用中」。
               若該座位已被他人預約,後端會回傳 409 Conflict。
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
