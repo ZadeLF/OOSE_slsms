@@ -1,0 +1,41 @@
+@startuml deployment-diagram
+title SLSMS V1.0 — Deployment Diagram (現況；無資料庫 / 無 Redis / 無感測器硬體)
+
+node "使用者裝置\n(Browser)" as Browser {
+  component "SLSMS Frontend\n(React 18 + Vite)\nhttp://localhost:5173" as Frontend
+}
+
+node "應用伺服器\n(Spring Boot 內嵌 Tomcat)\nhttp://localhost:8080" as AppServer {
+  component "SeatController\nSensorController\nAlertController" as Controllers
+  component "SeatService" as Service
+  component "domain.state\n(State Pattern)" as StatePkg
+  component "observer\n(Observer Pattern)" as ObserverPkg
+  component "SeatRepository\n(In-memory)" as Repo
+
+  database "ConcurrentHashMap\n(JVM Heap)\n— 無持久化，重啟即清空" as MemStore
+}
+
+Browser -down-> AppServer : HTTPS/HTTP\nREST + JSON\n(每 2 秒輪詢座位狀態)
+
+Frontend --> Controllers : "GET/POST /api/**\n(fetch)"
+Controllers --> Service
+Service --> StatePkg : "委派狀態轉移"
+Controllers --> ObserverPkg : "推送/查詢噪音警示"
+Service --> Repo
+Repo --> MemStore : "讀寫 Seat/Zone/Floor"
+
+note right of MemStore
+  V1.0 現況：所有資料存於後端 JVM
+  的 ConcurrentHashMap，後端重啟
+  即清空，無 MySQL / Redis。
+  (MySQL + Redis 為 SDD §1.2
+   V2 規劃架構，本圖不繪製)
+end note
+
+note left of Browser
+  「A 區噪音感測器」面板
+  直接呼叫 POST /api/sensors/noise
+  模擬感測器讀數，
+  無實體 ESP32 / MQTT。
+end note
+@enduml

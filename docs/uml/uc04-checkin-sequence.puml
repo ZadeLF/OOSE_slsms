@@ -1,0 +1,49 @@
+@startuml uc04-checkin-sequence
+title UC-04 QR Code 報到 (Check-in) — Sequence Diagram
+
+actor Reader as reader
+participant "Frontend\n(App.jsx / ControlPanel.jsx)" as FE
+participant "SeatController" as Controller
+participant "SeatService" as Service
+participant "SeatRepository" as Repo
+participant "Seat\n(State Pattern Context)" as Seat
+participant "SeatState\n(目前狀態，例如 IdleState)" as State
+participant "GlobalExceptionHandler" as ExHandler
+
+reader -> FE : 點擊「掃 QR Check-in」
+FE -> FE : 顯示 QRDisplay\n(QRCodeSVG, value="SLSMS:CHECKIN:{seatId}")
+reader -> FE : 點擊「模擬掃描成功」\n(代表已掃描取得上述字串)
+
+FE -> Controller : POST /api/seats/{seatId}/checkin\nActionRequest{userId}
+Controller -> Service : checkIn(seatId, userId)
+Service -> Repo : findById(seatId)
+Repo --> Service : Optional<Seat>
+
+alt 座位不存在
+  Service -> ExHandler : throw SeatNotFoundException
+  ExHandler --> FE : 404 Not Found
+else 座位存在
+  Service -> Seat : checkIn(userId)
+  Seat -> State : state.checkIn(seat, userId)
+
+  alt 狀態允許 Check-in\n(Idle 或本人 Reserved)
+    State -> State : 更新 currentUserId / sessionStart\n(若為 Reserved 則清空 reservationOwner)
+    State --> Seat : return SeatStates.OCCUPIED
+    Seat -> Seat : this.state = OCCUPIED
+    Seat --> Service : void (狀態已切換)
+    Service -> Repo : save(seat)
+    Service --> Controller : Seat (state=OCCUPIED)
+    Controller --> FE : 200 OK, SeatDto{state:"OCCUPIED", currentUserId,...}
+    FE -> FE : 更新樓層圖座位顏色為「使用中」
+  else 狀態不允許\n(例如已被他人預約 / 已被佔用)
+    State -> State : throw IllegalStateTransitionException
+    State --> Seat : (exception)
+    Seat --> Service : (exception)
+    Service --> Controller : (exception)
+    Controller -> ExHandler : 攔截例外
+    ExHandler --> FE : 409 Conflict\n{status:409, error:"IllegalStateTransition", message:"..."}
+    FE -> FE : 顯示紅色錯誤訊息條
+  end
+end
+
+@enduml

@@ -1,0 +1,45 @@
+@startuml use-case-diagram
+title SLSMS V1.0 — Use Case Diagram (僅列出已實作的 Use Case)
+
+left to right direction
+
+actor "Reader\n讀者" as Reader
+actor "Admin\n管理員" as Admin
+actor "SensorSystem\n(前端噪音模擬器)" as SensorSystem
+
+rectangle "SLSMS" {
+  usecase "UC-01\n查詢座位狀態" as UC01
+  usecase "UC-02\n即時預約座位" as UC02
+  usecase "UC-04\nQR Code 報到\n(簡化版)" as UC04
+  usecase "UC-06\n暫離與恢復座位" as UC06
+  usecase "UC-08a\n推送噪音讀數" as UC08a
+  usecase "UC-08b\n查看環境警示\n(近期警示/數位看板)" as UC08b
+}
+
+Reader --> UC01
+Reader --> UC02
+Reader --> UC04
+Reader --> UC06
+
+SensorSystem --> UC08a
+Admin --> UC08b
+
+UC08a ..> UC08b : <<triggers>>\n(Observer Pattern)
+
+note right of UC04
+  V1.0 簡化版：QR Code 為
+  qrcode.react 產生的真實編碼
+  (SLSMS:CHECKIN:{seatId})，
+  以「模擬掃描成功」按鈕送出，
+  無相機掃描 / 無 JWT 驗證。
+end note
+
+note bottom of UC08a
+  本版無實體感測器，
+  由前端「A 區噪音感測器」
+  面板呼叫 POST /api/sensors/noise
+  模擬讀數推送。
+end note
+
+note "以下 Use Case 為 V2 規劃中，\n本圖不繪製：UC-03 分時段預訂、\nUC-05 身分驗證、UC-07 強制釋放座位、\nUC-09 使用分析報表" as N1
+@enduml

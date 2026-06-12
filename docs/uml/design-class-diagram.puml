@@ -1,0 +1,201 @@
+@startuml design-class-diagram
+title SLSMS V1.0 — Design Class Diagram (State Pattern + Observer Pattern)
+
+package "domain.state — State Pattern" {
+  interface SeatState {
+    +name(): String
+    +reserve(seat, userId): SeatState
+    +checkIn(seat, userId): SeatState
+    +leaveTemporarily(seat, userId): SeatState
+    +comeBack(seat, userId): SeatState
+    +release(seat, userId): SeatState
+    +timeout(seat): SeatState
+    .. 預設行為 ..
+    所有方法預設皆 throw\nIllegalStateTransitionException
+  }
+
+  class IdleState implements SeatState {
+    +reserve()
+    +checkIn()
+  }
+  class ReservedState implements SeatState {
+    +checkIn()  ' 僅 reservationOwner 可呼叫
+    +release()
+    +timeout()
+  }
+  class OccupiedState implements SeatState {
+    +leaveTemporarily()  ' 僅 currentUserId 可呼叫
+    +release()           ' 僅 currentUserId 可呼叫
+    -requireOwner(seat, userId, action)
+  }
+  class TempAwayState implements SeatState {
+    +comeBack()  ' 僅 currentUserId 可呼叫
+    +release()   ' 僅 currentUserId 可呼叫
+    +timeout()
+    -requireOwner(seat, userId, action)
+  }
+
+  class SeatStates <<Flyweight / Singleton holder>> {
+    +{static} IDLE: SeatState
+    +{static} RESERVED: SeatState
+    +{static} OCCUPIED: SeatState
+    +{static} TEMP_AWAY: SeatState
+    +{static} byName(name): SeatState
+  }
+
+  SeatStates ..> IdleState : creates singleton
+  SeatStates ..> ReservedState : creates singleton
+  SeatStates ..> OccupiedState : creates singleton
+  SeatStates ..> TempAwayState : creates singleton
+}
+
+package "domain — Context" {
+  class Seat <<State Pattern Context>> {
+    -id: String
+    -zoneId: String
+    -gridRow: int
+    -gridCol: int
+    -state: SeatState
+    -currentUserId: String
+    -reservationOwner: String
+    -sessionStart: Instant
+    -tempAwaySince: Instant
+    -lastChange: Instant
+    +reserve(userId)
+    +checkIn(userId)
+    +leaveTemporarily(userId)
+    +comeBack(userId)
+    +release(userId)
+    +timeout()
+    +getStateName(): String
+  }
+
+  class Zone {
+    -id: String
+    -noiseThresholdDb: double
+    +getSeats(): List<Seat>
+  }
+
+  class Floor {
+    -id: String
+    +getZones(): List<Zone>
+  }
+
+  Floor "1" *-- "*" Zone
+  Zone "1" *-- "*" Seat
+  Seat "1" o-- "1" SeatState : delegates to >
+}
+
+package "exception" {
+  class IllegalStateTransitionException
+  class SeatNotFoundException
+  class GlobalExceptionHandler {
+    +handleIllegalStateTransition(): 409
+    +handleSeatNotFound(): 404
+    +handleIllegalArgument(): 400
+  }
+  SeatState ..> IllegalStateTransitionException : throws
+  GlobalExceptionHandler ..> IllegalStateTransitionException : @ExceptionHandler
+  GlobalExceptionHandler ..> SeatNotFoundException : @ExceptionHandler
+}
+
+package "observer — Observer Pattern" {
+  interface AlertObserver {
+    +channelName(): String
+    +onAlert(event: AlertEvent)
+  }
+
+  class AlertEvent <<record>> {
+    +id: String
+    +zoneId: String
+    +type: String
+    +value: double
+    +threshold: double
+    +message: String
+    +occurredAt: Instant
+    +{static} noiseHigh(zoneId, dB, threshold): AlertEvent
+  }
+
+  class NoiseMonitor <<Subject>> {
+    -observers: List<AlertObserver>
+    -thresholds: Map<String, Double>
+    -latest: Map<String, Double>
+    -alertActive: Map<String, Boolean>
+    +register(observer)
+    +unregister(observer)
+    +recordNoise(zoneId, dB)
+    +getThreshold(zoneId): double
+    +isAlertActive(zoneId): boolean
+    -notifyAll(event: AlertEvent)
+  }
+
+  class AdminPushChannel implements AlertObserver {
+    -buffer: Deque<AlertEvent>
+    +onAlert(event)
+    +recent(): List<AlertEvent>
+  }
+
+  class DigitalSignageChannel implements AlertObserver {
+    -currentMessage: Map<String, String>
+    +onAlert(event)
+    +messageFor(zoneId): String
+  }
+
+  NoiseMonitor o-- "*" AlertObserver : notifies >
+  NoiseMonitor ..> AlertEvent : creates / dispatches
+  AlertObserver ..> AlertEvent : receives
+}
+
+package "service / repository / controller" {
+  class SeatService {
+    +reserve(seatId, userId): Seat
+    +checkIn(seatId, userId): Seat
+    +leaveTemporarily(seatId, userId): Seat
+    +comeBack(seatId, userId): Seat
+    +release(seatId, userId): Seat
+  }
+  class SeatRepository <<in-memory>> {
+    -seats: ConcurrentMap<String, Seat>
+    -zones: ConcurrentMap<String, Zone>
+    -floors: ConcurrentMap<String, Floor>
+    +save(seat)
+    +findById(id): Optional<Seat>
+    +findByZone(zoneId): List<Seat>
+    +findByFloor(floorId): List<Seat>
+  }
+  class SeatController {
+    +reserve()
+    +checkIn()
+    +leaveTemp()
+    +comeBack()
+    +release()
+  }
+  class SensorController {
+    +pushNoise(zoneId, dB)
+    +getNoise(zoneId)
+  }
+  class AlertController {
+    +recentAlerts()
+    +signageFor(zoneId)
+  }
+
+  SeatController ..> SeatService
+  SeatService ..> SeatRepository
+  SeatService ..> Seat
+  SensorController ..> NoiseMonitor
+  AlertController ..> AdminPushChannel
+  AlertController ..> DigitalSignageChannel
+}
+
+note bottom of SeatStates
+  Flyweight：每個 SeatState 子類別僅有一個
+  共享實例，因為狀態本身不持有任何
+  座位專屬資料（資料皆存於 Seat Context）。
+end note
+
+note bottom of NoiseMonitor
+  邊緣觸發 (edge-triggered)：
+  僅在 dB 由「未超標」轉為「超標」時
+  才呼叫 notifyAll()，避免持續轟炸通知。
+end note
+@enduml
