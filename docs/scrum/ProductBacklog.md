@@ -160,36 +160,36 @@
 
 ## 4. 報表與分析類
 
-### US-09 使用分析報表（Strategy Pattern）
+### US-09 使用分析報表（Strategy Pattern） ✅ Sprint 2 已完成
 
-> 身為**營運單位**，我希望能取得**每日座位使用率與熱點報表**，
+> 身為**營運單位**，我希望能取得**座位使用率與環境警示熱點報表**，
 > 以便評估空間規劃是否需要調整。
 
-**對應需求**：FR-08、UC-09（完全未實作，原規劃 `IReportStrategy`）
+**對應需求**：FR-08、UC-09
 
 **驗收條件**：
-- 定義 `IReportStrategy` 介面，至少實作「時段使用率」與「熱點分析」兩種策略。
-- 新增 `GET /api/reports/heatmap?date=...`，回傳依 Strategy 計算後的結果（JSON）。
-- 提供 CSV 匯出端點或前端下載按鈕。
-- 新增至少 2 個策略各自的單元測試，以及 Controller 層的整合測試。
+- [x] 定義 `ReportStrategy` 介面，實作「座位使用率報表」(`seat-usage`) 與「環境警示熱點報表」(`environment-alerts`，整合噪音+溫度) 兩種策略。
+- [x] 新增 `GET /api/reports`（列出可用報表類型）與 `GET /api/reports/{type}`，回傳依 Strategy 計算後的結果（JSON）；未知 type 回 400。
+- [x] 新增 3 個策略/服務單元測試（`SeatUsageReportStrategyTest`、`EnvironmentAlertReportStrategyTest`、`ReportServiceTest`，共 8 條），驗證計算正確性與策略可替換（多型）。
+- [ ] 每日排程產出與 CSV 匯出 — 列為後續規劃，本 Sprint 範圍為「即時（in-memory）查詢」。
 
-**優先級**：低　**估點**：8（依賴 US-06，需有歷史使用紀錄資料才能產生有意義的報表）
+**優先級**：低　**估點**：8 → **實際完成於 Sprint 2**（範圍縮小為即時記憶體查詢，不依賴 US-06 持久化），對應 commit `17d7772`、`c02fef7`
 
 ---
 
-### US-10 溫度感測與 Observer 擴充
+### US-10 溫度感測與 Observer 擴充 ✅ Sprint 2 已完成
 
 > 身為**管理員**，我希望除了噪音之外，**溫度異常也能透過既有的警示推播機制**通知我，
 > 以便環境異常時能更全面掌握。
 
-**對應需求**：FR-06 溫度部分（噪音已完成，溫度為 V2）
+**對應需求**：FR-06 溫度部分（噪音已完成，溫度為 Version 2.0）
 
 **驗收條件**：
-- 新增 `POST /api/sensors/temperature`，沿用既有 `NoiseMonitor`/`AlertObserver` 架構（或新增 `TemperatureMonitor` 並複用 `AlertObserver` 介面）。
-- 溫度超過門檻時，`AdminPushChannel`、`DigitalSignageChannel` 收到對應警示，行為與噪音一致（邊緣觸發）。
-- 新增對應的單元測試，驗證邊緣觸發行為（仿照 `NoiseObserverTest`）。
+- [x] 新增 `POST /api/sensors/temperature`、`GET /api/sensors/temperature/{zoneId}`，新增 `TemperatureMonitor` 並複用 `AlertObserver` 介面。
+- [x] 溫度超過上限或低於下限時，`AdminPushChannel`、`DigitalSignageChannel` 收到對應 `TEMP_HIGH`/`TEMP_LOW` 警示，行為與噪音一致（邊緣觸發）。
+- [x] 新增 `TemperatureObserverTest`（7 條），驗證邊緣觸發行為（仿照 `NoiseObserverTest`），並驗證噪音與溫度監測器互不影響。
 
-**優先級**：低　**估點**：3（架構可直接複用 Observer Pattern，成本主要在新增 Concrete Subject）
+**優先級**：低　**估點**：3 → **實際完成於 Sprint 2**，對應 commit `6f9f4e8`、`c02fef7`
 
 ---
 
@@ -231,17 +231,19 @@
 
 | 優先級 | Story | 估點 | 建議排入 Sprint |
 |---|---|---|---|
-| 高 | US-01 預約/暫離逾時自動釋放 | 5 | Sprint 2 |
+| 低 | US-09 使用分析報表（Strategy Pattern） | 8 | ✅ Sprint 2（已完成，範圍縮小為即時記憶體查詢） |
+| 低 | US-10 溫度感測與 Observer 擴充 | 3 | ✅ Sprint 2（已完成） |
+| 高 | US-01 預約/暫離逾時自動釋放 | 5 | Sprint 3 |
 | 中 | US-04 讀者/管理員登入與角色區分 | 8 | Sprint 3+ |
 | 中 | US-05 管理員強制釋放座位 | 5 | Sprint 3+（依賴 US-04） |
 | 中 | US-03 真實相機掃描 QR + 身分驗證 | 8 | Sprint 3+（依賴 US-04） |
 | 中 | US-06 JPA / MySQL 持久化 | 8 | Sprint 3+ |
-| 中 | US-11 行動裝置 RWD | 3 | Sprint 2 或 3 |
+| 中 | US-11 行動裝置 RWD | 3 | Sprint 3 |
 | 低 | US-08 感測器抽象介面 | 3 | Sprint 3+ |
-| 低 | US-10 溫度感測與 Observer 擴充 | 3 | Sprint 3+ |
 | 低 | US-02 分時段預訂 | 8 | Sprint 4+ |
 | 低 | US-07 Redis 即時狀態快取 | 5 | Sprint 4+（依賴 US-06） |
-| 低 | US-09 使用分析報表 | 8 | Sprint 4+（依賴 US-06） |
 | 低 | US-12 500 並發效能驗證 | 3 | Sprint 4+（依賴 US-06/US-07） |
 
-> 本表僅排到 Sprint 2，後續 Sprint 排序請小組依期末時間表與人力調整。
+> Sprint 2 實際完成 US-09、US-10（詳見 [`Sprint2.md`](./Sprint2.md)）。
+> US-01 因 Sprint 2 改為優先處理 US-09/US-10，順延至 Sprint 3。
+> 本表排到 Sprint 2 為止，後續 Sprint 排序請小組依期末時間表與人力調整。

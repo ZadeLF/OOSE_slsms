@@ -1,11 +1,11 @@
 @startuml use-case-diagram
-title SLSMS V1.0 — Use Case Diagram (僅列出已實作的 Use Case)
+title SLSMS V2.0 — Use Case Diagram (僅列出已實作的 Use Case)
 
 left to right direction
 
 actor "Reader\n讀者" as Reader
 actor "Admin\n管理員" as Admin
-actor "SensorSystem\n(前端噪音模擬器)" as SensorSystem
+actor "SensorSystem\n(前端噪音/溫度模擬器)" as SensorSystem
 
 rectangle "SLSMS" {
   usecase "UC-01\n查詢座位狀態" as UC01
@@ -13,7 +13,9 @@ rectangle "SLSMS" {
   usecase "UC-04\nQR Code 報到\n(簡化版)" as UC04
   usecase "UC-06\n暫離與恢復座位" as UC06
   usecase "UC-08a\n推送噪音讀數" as UC08a
+  usecase "UC-08c\n推送溫度讀數" as UC08c
   usecase "UC-08b\n查看環境警示\n(近期警示/數位看板)" as UC08b
+  usecase "UC-09\n查看使用分析報表\n(座位使用率/環境警示熱點)" as UC09
 }
 
 Reader --> UC01
@@ -22,9 +24,12 @@ Reader --> UC04
 Reader --> UC06
 
 SensorSystem --> UC08a
+SensorSystem --> UC08c
 Admin --> UC08b
+Admin --> UC09
 
 UC08a ..> UC08b : <<triggers>>\n(Observer Pattern)
+UC08c ..> UC08b : <<triggers>>\n(Observer Pattern)
 
 note right of UC04
   V1.0 簡化版：QR Code 為
@@ -41,5 +46,21 @@ note bottom of UC08a
   模擬讀數推送。
 end note
 
-note "以下 Use Case 為 V2 規劃中，\n本圖不繪製：UC-03 分時段預訂、\nUC-05 身分驗證、UC-07 強制釋放座位、\nUC-09 使用分析報表" as N1
+note bottom of UC08c
+  V2.0 新增：「A 區溫度感測器」
+  面板呼叫 POST /api/sensors/temperature
+  模擬讀數推送，沿用與 UC-08a 相同的
+  Observer Pattern（TemperatureMonitor
+  為第二個 Subject）。
+end note
+
+note right of UC09
+  V2.0 新增：以 Strategy Pattern
+  (ReportStrategy) 實作，GET /api/reports/{type}
+  提供「座位使用率報表」(seat-usage) 與
+  「環境警示熱點報表」(environment-alerts)
+  兩種策略，資料來源為現有記憶體狀態。
+end note
+
+note "以下 Use Case 為 V2 後續規劃中，\n本圖不繪製：UC-03 分時段預訂、\nUC-05 身分驗證、UC-07 強制釋放座位" as N1
 @enduml

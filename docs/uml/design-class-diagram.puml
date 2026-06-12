@@ -1,5 +1,5 @@
 @startuml design-class-diagram
-title SLSMS V1.0 — Design Class Diagram (State Pattern + Observer Pattern)
+title SLSMS V2.0 — Design Class Diagram (State + Observer + Strategy Pattern)
 
 package "domain.state — State Pattern" {
   interface SeatState {
@@ -114,6 +114,8 @@ package "observer — Observer Pattern" {
     +message: String
     +occurredAt: Instant
     +{static} noiseHigh(zoneId, dB, threshold): AlertEvent
+    +{static} tempHigh(zoneId, celsius, upperBound): AlertEvent
+    +{static} tempLow(zoneId, celsius, lowerBound): AlertEvent
   }
 
   class NoiseMonitor <<Subject>> {
@@ -125,6 +127,21 @@ package "observer — Observer Pattern" {
     +unregister(observer)
     +recordNoise(zoneId, dB)
     +getThreshold(zoneId): double
+    +isAlertActive(zoneId): boolean
+    -notifyAll(event: AlertEvent)
+  }
+
+  class TemperatureMonitor <<Subject>> {
+    -observers: List<AlertObserver>
+    -lowerBounds: Map<String, Double>
+    -upperBounds: Map<String, Double>
+    -latest: Map<String, Double>
+    -activeAlertType: Map<String, String>
+    +register(observer)
+    +unregister(observer)
+    +recordTemperature(zoneId, celsius)
+    +getLowerBound(zoneId): double
+    +getUpperBound(zoneId): double
     +isAlertActive(zoneId): boolean
     -notifyAll(event: AlertEvent)
   }
@@ -142,8 +159,19 @@ package "observer — Observer Pattern" {
   }
 
   NoiseMonitor o-- "*" AlertObserver : notifies >
+  TemperatureMonitor o-- "*" AlertObserver : notifies >
   NoiseMonitor ..> AlertEvent : creates / dispatches
+  TemperatureMonitor ..> AlertEvent : creates / dispatches
   AlertObserver ..> AlertEvent : receives
+
+  note bottom of TemperatureMonitor
+    V2.0 新增的第二個 Subject：
+    與 NoiseMonitor 結構相同但雙邊界
+    (上限/下限) 邊緣觸發；AdminPushChannel /
+    DigitalSignageChannel 在建構子中
+    同時向兩個 Subject register(this)，
+    Observer 介面本身不需修改 (OCP)。
+  end note
 }
 
 package "service / repository / controller" {
@@ -173,6 +201,8 @@ package "service / repository / controller" {
   class SensorController {
     +pushNoise(zoneId, dB)
     +getNoise(zoneId)
+    +pushTemperature(zoneId, celsius)
+    +getTemperature(zoneId)
   }
   class AlertController {
     +recentAlerts()
@@ -183,8 +213,101 @@ package "service / repository / controller" {
   SeatService ..> SeatRepository
   SeatService ..> Seat
   SensorController ..> NoiseMonitor
+  SensorController ..> TemperatureMonitor
   AlertController ..> AdminPushChannel
   AlertController ..> DigitalSignageChannel
+}
+
+package "report — Strategy Pattern" {
+  interface ReportStrategy {
+    +type(): String
+    +title(): String
+    +generate(): Object
+  }
+
+  class SeatUsageReportStrategy implements ReportStrategy {
+    +type(): "seat-usage"
+    +generate(): SeatUsageReport
+  }
+
+  class EnvironmentAlertReportStrategy implements ReportStrategy {
+    +type(): "environment-alerts"
+    +generate(): EnvironmentAlertReport
+  }
+
+  class SeatUsageReport <<record>> {
+    +type: String
+    +title: String
+    +totalSeats: int
+    +countByState: Map<String, Long>
+    +occupancyRate: double
+    +byZone: List<ZoneUsage>
+  }
+
+  class ZoneUsage <<record>> {
+    +zoneId: String
+    +totalSeats: int
+    +countByState: Map<String, Long>
+    +occupancyRate: double
+  }
+
+  class EnvironmentAlertReport <<record>> {
+    +type: String
+    +title: String
+    +totalRecentAlerts: int
+    +byZone: List<ZoneEnvironment>
+  }
+
+  class ZoneEnvironment <<record>> {
+    +zoneId: String
+    +zoneName: String
+    +latestNoiseDb: double
+    +noiseThreshold: double
+    +noiseAlertActive: boolean
+    +recentNoiseAlerts: long
+    +latestTemperature: double
+    +temperatureLowerBound: double
+    +temperatureUpperBound: double
+    +temperatureAlertActive: boolean
+    +recentTemperatureAlerts: long
+  }
+
+  class ReportService <<Strategy Context>> {
+    -strategiesByType: Map<String, ReportStrategy>
+    +generate(type): Object
+    +availableTypes(): List<ReportTypeDto>
+  }
+
+  class ReportTypeDto <<record>> {
+    +type: String
+    +title: String
+  }
+
+  class ReportController {
+    +listTypes(): List<ReportTypeDto>
+    +get(type): Object
+  }
+
+  ReportService o-- "*" ReportStrategy : dispatches to >
+  SeatUsageReportStrategy ..> SeatUsageReport : creates
+  SeatUsageReport "1" *-- "*" ZoneUsage
+  EnvironmentAlertReportStrategy ..> EnvironmentAlertReport : creates
+  EnvironmentAlertReport "1" *-- "*" ZoneEnvironment
+  SeatUsageReportStrategy ..> SeatRepository
+  EnvironmentAlertReportStrategy ..> SeatRepository
+  EnvironmentAlertReportStrategy ..> NoiseMonitor
+  EnvironmentAlertReportStrategy ..> TemperatureMonitor
+  EnvironmentAlertReportStrategy ..> AdminPushChannel
+  ReportController ..> ReportService
+
+  note bottom of ReportService
+    Strategy Pattern：Spring 注入
+    List<ReportStrategy>，以 type() 為 key
+    建立 map。新增報表型態只需新增一個
+    @Component 實作 ReportStrategy，
+    ReportService/ReportController/呼叫端
+    皆不需修改 (OCP)。
+  end note
 }
 
 note bottom of SeatStates
